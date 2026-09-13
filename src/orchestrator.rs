@@ -57,7 +57,7 @@ impl Orchestrator {
     /// multiple backends (e.g. CPU + GPU) concurrently for throughput. Each
     /// solution is submitted immediately once found, to win the first-come,
     /// first-served race. Returns the number of solutions found.
-    fn mine_tasks(&self, tasks: Vec<Task>, stats: &Stats) -> usize {
+    fn mine_tasks(&self, tasks: Vec<Task>, stats: &Stats, started: Instant, base_hashes: u64) -> usize {
         let n = self.backends.len();
         if n == 1 {
             let backend = &self.backends[0];
@@ -70,7 +70,8 @@ impl Orchestrator {
                         &sol.hash[..16],
                         format_thousands(sol.nonce)
                     );
-                    self.submit_solution(&sol, stats);
+                    let hashrate = self.current_hashrate(started, base_hashes);
+                    self.submit_solution(&sol, task.difficulty, hashrate, stats);
                     found += 1;
                 } else {
                     println!("\n    -> Nonce range exhausted (no hit).");
@@ -106,7 +107,8 @@ impl Orchestrator {
                                     &sol.hash[..16],
                                     format_thousands(sol.nonce)
                                 );
-                                self.submit_solution(&sol, stats);
+                                let hashrate = self.current_hashrate(started, base_hashes);
+                                self.submit_solution(&sol, task.difficulty, hashrate, stats);
                                 found.fetch_add(1, Ordering::Relaxed);
                             } else {
                                 println!("\n    -> [{}] Nonce range exhausted (no hit).", backend.name());
@@ -120,11 +122,25 @@ impl Orchestrator {
         }
     }
 
+    /// Instantaneous hashrate for the in-progress batch, as of right now.
+    fn current_hashrate(&self, started: Instant, base_hashes: u64) -> f64 {
+        let elapsed = started.elapsed().as_secs_f64();
+        let delta = self.counter.load(Ordering::Relaxed) - base_hashes;
+        if elapsed > 0.0 {
+            delta as f64 / elapsed
+        } else {
+            0.0
+        }
+    }
+
     /// Submit a single freshly-found solution to the ledger immediately and
     /// record the outcome in the shared session stats.
-    fn submit_solution(&self, sol: &Solution, stats: &Stats) {
+    fn submit_solution(&self, sol: &Solution, difficulty: u32, hashrate: f64, stats: &Stats) {
         let batch = [sol.clone()];
-        match self.client.submit(&batch, self.account.as_deref()) {
+        match self
+            .client
+            .submit(&batch, self.account.as_deref(), difficulty, hashrate)
+        {
             Ok(resp) => {
                 if resp.accepted > 0 {
                     let earned: f64 = resp
@@ -251,7 +267,7 @@ impl Orchestrator {
 
         let started = Instant::now();
         let base_hashes = self.counter.load(Ordering::Relaxed);
-        let found = self.mine_tasks(tasks, stats);
+        let found = self.mine_tasks(tasks, stats, started, base_hashes);
         let elapsed = started.elapsed().as_secs_f64();
         let delta = self.counter.load(Ordering::Relaxed) - base_hashes;
         if elapsed > 0.0 {
@@ -263,6 +279,11 @@ impl Orchestrator {
 
         if found == 0 {
             println!("[-] Done with batch, but zero solutions found.");
+            if elapsed > 0.0 {
+                if let Err(e) = self.client.report_hashrate(self.difficulty, delta as f64 / elapsed) {
+                    println!("[-] Failed to report hashrate: {e}");
+                }
+            }
         }
         println!("{}", "=".repeat(55));
         Ok(())

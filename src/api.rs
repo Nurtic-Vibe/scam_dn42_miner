@@ -60,8 +60,18 @@ impl Client {
         Ok(body.tasks)
     }
 
-    pub fn submit(&self, solutions: &[Solution], account: Option<&str>) -> Result<SubmitResponse> {
-        let mut payload = serde_json::json!({ "solutions": solutions });
+    pub fn submit(
+        &self,
+        solutions: &[Solution],
+        account: Option<&str>,
+        difficulty: u32,
+        hashrate: f64,
+    ) -> Result<SubmitResponse> {
+        let mut payload = serde_json::json!({
+            "solutions": solutions,
+            "difficulty": difficulty,
+            "hashrate": hashrate,
+        });
         if let Some(a) = account {
             payload["account_number"] = serde_json::Value::String(a.to_string());
         }
@@ -86,6 +96,31 @@ impl Client {
         }
 
         serde_json::from_value(data).context("invalid submit response")
+    }
+
+    /// Report the current hashrate for a batch that produced no solutions,
+    /// so the server still sees the miner's contribution.
+    pub fn report_hashrate(&self, difficulty: u32, hashrate: f64) -> Result<()> {
+        let payload = serde_json::json!({
+            "difficulty": difficulty,
+            "hashrate": hashrate,
+        });
+
+        let resp = self
+            .http
+            .post(format!("{}/api/mining/hashrate", self.base))
+            .bearer_auth(&self.token)
+            .json(&payload)
+            .send()
+            .context("hashrate report failed")?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().unwrap_or_default();
+            let error = extract_error(&body).unwrap_or(body);
+            bail!("{error}");
+        }
+        Ok(())
     }
 }
 
