@@ -14,6 +14,7 @@ pub struct Orchestrator {
     difficulty: u32,
     batch_size: u32,
     account: Option<String>,
+    worker_id: Option<String>,
     counter: Arc<AtomicU64>,
 }
 
@@ -42,6 +43,7 @@ impl Orchestrator {
         difficulty: u32,
         batch_size: u32,
         account: Option<String>,
+        worker_id: Option<String>,
     ) -> Self {
         Self {
             client,
@@ -49,6 +51,7 @@ impl Orchestrator {
             difficulty,
             batch_size,
             account,
+            worker_id,
             counter: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -137,10 +140,13 @@ impl Orchestrator {
     /// record the outcome in the shared session stats.
     fn submit_solution(&self, sol: &Solution, difficulty: u32, hashrate: f64, stats: &Stats) {
         let batch = [sol.clone()];
-        match self
-            .client
-            .submit(&batch, self.account.as_deref(), difficulty, hashrate)
-        {
+        match self.client.submit(
+            &batch,
+            self.account.as_deref(),
+            difficulty,
+            hashrate,
+            self.worker_id.as_deref(),
+        ) {
             Ok(resp) => {
                 if resp.accepted > 0 {
                     let earned: f64 = resp
@@ -280,7 +286,11 @@ impl Orchestrator {
         if found == 0 {
             println!("[-] Done with batch, but zero solutions found.");
             if elapsed > 0.0 {
-                if let Err(e) = self.client.report_hashrate(self.difficulty, delta as f64 / elapsed) {
+                if let Err(e) = self.client.report_hashrate(
+                    self.difficulty,
+                    delta as f64 / elapsed,
+                    self.worker_id.as_deref(),
+                ) {
                     println!("[-] Failed to report hashrate: {e}");
                 }
             }

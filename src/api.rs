@@ -83,6 +83,7 @@ impl Client {
         account: Option<&str>,
         difficulty: u32,
         hashrate: f64,
+        worker_id: Option<&str>,
     ) -> Result<SubmitResponse> {
         let mut payload = serde_json::json!({
             "solutions": solutions,
@@ -91,6 +92,9 @@ impl Client {
         });
         if let Some(a) = account {
             payload["account_number"] = serde_json::Value::String(a.to_string());
+        }
+        if let Some(w) = worker_id {
+            payload["worker_id"] = serde_json::Value::String(w.to_string());
         }
 
         let resp = self
@@ -117,11 +121,14 @@ impl Client {
 
     /// Report the current hashrate for a batch that produced no solutions,
     /// so the server still sees the miner's contribution.
-    pub fn report_hashrate(&self, difficulty: u32, hashrate: f64) -> Result<()> {
-        let payload = serde_json::json!({
+    pub fn report_hashrate(&self, difficulty: u32, hashrate: f64, worker_id: Option<&str>) -> Result<()> {
+        let mut payload = serde_json::json!({
             "difficulty": difficulty,
             "hashrate": hashrate,
         });
+        if let Some(w) = worker_id {
+            payload["worker_id"] = serde_json::Value::String(w.to_string());
+        }
 
         let resp = self
             .http

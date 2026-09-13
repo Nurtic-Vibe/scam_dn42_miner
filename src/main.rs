@@ -93,6 +93,10 @@ struct MineArgs {
     #[arg(long)]
     account: Option<String>,
 
+    /// Identifier for this worker, reported alongside submissions and hashrate
+    #[arg(long)]
+    worker_id: Option<String>,
+
     /// Acceleration backend to use
     #[arg(long, value_enum, default_value_t = BackendKind::Auto)]
     backend: BackendKind,
@@ -151,6 +155,7 @@ fn run_miner(args: MineArgs) -> Result<()> {
         args.difficulty,
         args.batch_size,
         account,
+        args.worker_id,
     );
     orch.run()?;
     Ok(())
