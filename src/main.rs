@@ -73,6 +73,10 @@ struct MineArgs {
     #[arg(long, required = true)]
     token: String,
 
+    /// Proxy URL, such as http://host:port, https://host:port, or socks5://host:port
+    #[arg(long)]
+    proxy: Option<String>,
+
     /// Difficulty level (5-11)
     #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u32).range(5..=11))]
     difficulty: u32,
@@ -132,7 +136,7 @@ fn run_miner(args: MineArgs) -> Result<()> {
         None => None,
     };
 
-    let client = api::Client::new(args.url.clone(), args.token.clone())?;
+    let client = api::Client::new(args.url.clone(), args.token.clone(), args.proxy)?;
 
     let backends = build_backends(args.backend, cores, args.device, false);
 

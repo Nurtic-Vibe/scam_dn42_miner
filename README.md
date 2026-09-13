@@ -27,8 +27,11 @@ scam-miner benchmark
 scam-miner benchmark --backend opencl --device 0
 
 # start mining (optionally pick a specific device)
-scam-miner mine --token <API_TOKEN> [--difficulty 6] [--batch-size 100] [--account DN420042...] [--device 0]
+scam-miner mine --token <API_TOKEN> [--proxy http://host:port] [--difficulty 6] [--batch-size 100] [--account DN420042...] [--device 0]
 ```
+
+The optional `--proxy` accepts HTTP, HTTPS, and SOCKS proxy URLs, including
+`socks5://host:port` and `socks5h://host:port`.
 
 See `scam-miner mine --help` for all options.
 
