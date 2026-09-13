@@ -16,11 +16,28 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(base: String, token: String) -> Result<Self> {
-        let http = reqwest::blocking::Client::builder()
+    pub fn new(base: String, token: String, proxy: Option<String>) -> Result<Self> {
+        let mut builder = reqwest::blocking::Client::builder()
             .danger_accept_invalid_certs(true)
-            .user_agent("Scummybank-Miner/3.0")
-            .build()?;
+            .user_agent("Scummybank-Miner/4.0");
+        if let Some(proxy) = proxy {
+            let proxy_url = reqwest::Url::parse(&proxy)
+                .with_context(|| format!("invalid proxy URL: {proxy}"))?;
+            if !matches!(
+                proxy_url.scheme(),
+                "http" | "https" | "socks" | "socks4" | "socks4a" | "socks5" | "socks5h"
+            ) {
+                bail!(
+                    "unsupported proxy scheme '{}'; use http, https, or socks",
+                    proxy_url.scheme()
+                );
+            }
+            builder = builder.proxy(
+                reqwest::Proxy::all(proxy_url)
+                    .with_context(|| format!("invalid proxy URL: {proxy}"))?,
+            );
+        }
+        let http = builder.build()?;
         Ok(Self {
             http,
             base: base.trim_end_matches('/').to_string(),
@@ -87,6 +104,7 @@ impl Client {
 
         serde_json::from_value(data).context("invalid submit response")
     }
+
 }
 
 /// Structured error from the mining task endpoint, so the orchestrator can

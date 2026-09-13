@@ -15,7 +15,7 @@ serde_json = "1"
 sha2 = "0.11"
 anyhow = "1"
 ctrlc = "3"
-reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "query", "blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "query", "blocking", "socks"] }
 
 # Vulkan backend (optional)
 wgpu = { version = "30", default-features = false, features = ["std", "vulkan", "wgsl"], optional = true }
